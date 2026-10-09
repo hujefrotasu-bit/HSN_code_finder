@@ -157,6 +157,11 @@ func (h *Handler) HandleClassify(w http.ResponseWriter, r *http.Request) {
 		chapter = selectedCode[:2]
 	}
 
+	isProvisional := rankRes.IsProvisional
+	if len(rankRes.Questions) > 0 || rankRes.ConfidenceScore < 0.85 {
+		isProvisional = true
+	}
+
 	finalResult := models.ClassificationResult{
 		HSCode:          selectedCode,
 		Description:     desc,
@@ -164,6 +169,7 @@ func (h *Handler) HandleClassify(w http.ResponseWriter, r *http.Request) {
 		ConfidenceScore: rankRes.ConfidenceScore,
 		Reason:          rankRes.Reason,
 		IsReliable:      true,
+		IsProvisional:   isProvisional,
 		Alternatives:    rankRes.Alternatives,
 		Questions:       rankRes.Questions,
 		TokenUsage:      totalUsage,

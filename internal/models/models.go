@@ -53,6 +53,7 @@ type ClassificationResult struct {
 	ConfidenceScore float64           `json:"confidence_score"`
 	Reason          string            `json:"reason"`
 	IsReliable      bool              `json:"is_reliable"`
+	IsProvisional   bool              `json:"is_provisional"`
 	Alternatives    []AlternativeCode `json:"alternatives,omitempty"`
 	Questions       []string          `json:"questions,omitempty"`
 	TokenUsage      *TokenUsage       `json:"token_usage,omitempty"`
@@ -63,6 +64,7 @@ type RankResult struct {
 	TopCode         string            `json:"top_code"`
 	IsRelevant      bool              `json:"is_relevant"`
 	ConfidenceScore float64           `json:"confidence_score"`
+	IsProvisional   bool              `json:"is_provisional"`
 	Reason          string            `json:"reason"`
 	Alternatives    []AlternativeCode `json:"alternatives,omitempty"`
 	Questions       []string          `json:"questions,omitempty"`

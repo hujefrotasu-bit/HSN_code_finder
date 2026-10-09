@@ -248,22 +248,39 @@ Your primary rule is SEMANTIC RELEVANCE:
   * Set "is_relevant": false
   * Set "top_code": ""
   * Set "confidence_score": 0.0
+  * Set "is_provisional": false
   * Set "reason": "Explain clearly why the retrieved candidates do not match the product."
-  * Set "questions": At most 2 short, actionable questions asking for CLASSIFICATION-RELEVANT SPECIFICATIONS that would change which HS chapter or heading applies. Each question must target a DIFFERENT attribute (e.g. one about material, one about processing stage). Do NOT ask questions that are already answered by the product attributes. Do NOT ask redundant or overlapping questions. Use colon-separated option lists where helpful (e.g. 'What is the primary material: wood, metal, plastic, or rubber?').
+  * Set "questions": Provide at most 1 short question asking for primary material or broad product category.
 
 If at least one candidate genuinely matches:
   * Set "is_relevant": true
-  * Set "top_code": "best matching code"
-  * Set "confidence_score": 0.1 to 1.0 based on precision (use 0.85+ only when material AND form are confirmed; use 0.4-0.69 when one key attribute is unknown)
-  * Set "reason": "Detailed explanation of why this code matches"
-  * Set "alternatives": [{"code": "...", "description": "..."}]
-  * Set "questions": At most 2 short questions, each targeting a DIFFERENT classification attribute that could change the exact 6-digit subheading. Do NOT ask a question if the attribute is already provided in the product data. Do NOT generate overlapping questions.
+  * Set "top_code": "best matching candidate code"
+  * Determine if classification is CONFIRMED or PROVISIONAL:
+    - STRONG MATCH (all essential attributes like material, form, process are known; no ambiguity):
+      * Set "is_provisional": false
+      * Set "confidence_score": 0.85 to 1.0
+      * Set "questions": [] (empty - no clarification needed!)
+    - PROVISIONAL MATCH (good candidate heading/subheading, but key attribute like form, dimensions, or hot/cold rolled stage is unknown):
+      * Set "is_provisional": true
+      * Set "confidence_score": 0.50 to 0.75
+      * In "reason", explain why this is the likely provisional match and what attribute is needed for the exact subheading. DO NOT invent unstated details (e.g. do not assume in coils or specific thickness unless stated).
+      * Set "questions": Exactly ONE focused question addressing the SINGLE attribute that most affects candidate ranking. Include clear options (e.g. "How is the steel supplied: Individual plate/sheet, or Coil?").
+    - SEVERAL MATERIALLY DIFFERENT CANDIDATES (broad query spanning multiple headings/subheadings):
+      * Set "is_provisional": true
+      * Set "confidence_score": 0.40 to 0.60
+      * Set "questions": Exactly ONE focused question with choices to resolve between candidates.
+
+Rules for "questions":
+1. Return AT MOST ONE question (length 0 or 1 array). NEVER return 2 or more questions.
+2. Ask ONLY when the answer could change the classification between candidates.
+3. If attributes are already known, return [] (empty array).
 
 Return ONLY valid JSON matching this schema:
 {
   "top_code": "string",
   "is_relevant": boolean,
   "confidence_score": number,
+  "is_provisional": boolean,
   "reason": "string",
   "alternatives": [{"code": "string", "description": "string"}],
   "questions": ["string"]
@@ -290,11 +307,20 @@ Return ONLY valid JSON matching this schema:
 			TopCode:         top.ID,
 			IsRelevant:      true,
 			ConfidenceScore: 0.70,
+			IsProvisional:   true,
 			Reason:          fmt.Sprintf("Matched candidate: %s", top.Text),
 			Tokens:          usage,
 		}, nil
 	}
 	result.Tokens = usage
+
+	// Strict guarantee: At most 1 question at a time
+	if len(result.Questions) > 1 {
+		result.Questions = result.Questions[:1]
+	}
+	if result.IsRelevant && (len(result.Questions) > 0 || result.ConfidenceScore < 0.85) {
+		result.IsProvisional = true
+	}
 
 	return &result, nil
 }
