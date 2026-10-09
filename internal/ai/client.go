@@ -168,7 +168,13 @@ func (c *Client) callChat(ctx context.Context, systemPrompt, userPrompt string) 
 // Understand extracts product attributes from the raw query.
 func (c *Client) Understand(ctx context.Context, query string) (*models.NormalizedProduct, error) {
 	systemPrompt := `You are an expert customs classification assistant. Your task is to normalize the user's commercial product name into international trade nomenclature and extract technical characteristics.
-In "normalized_product", include formal trade equivalents alongside the product name (e.g. "mobile charger" -> "electrical static converter power adapter", "laptop" -> "portable automatic data processing machine computer", "ms plate" -> "flat-rolled iron non-alloy steel plate").
+
+Rules:
+1. "normalized_product" MUST be a short, concise formal trade name only (2-6 words). Examples: "mobile charger" -> "USB power adapter", "laptop" -> "portable automatic data processing machine", "ms plate" -> "flat-rolled non-alloy steel plate", "cotton" -> "raw cotton fibre".
+2. If the query contains parenthetical clarifications like "cotton (ginned)" or "belt (Leather, clothing)", extract those values into the appropriate attribute fields (process, material, product_type, etc.). Do NOT include parenthetical text in "normalized_product".
+3. NEVER copy or embed text from HS candidate descriptions into "normalized_product" or any other field.
+4. Do not invent missing specs. Use null for unknown fields.
+
 Return ONLY valid JSON matching this schema:
 {
   "original_product": "string",
@@ -180,8 +186,7 @@ Return ONLY valid JSON matching this schema:
   "thickness": "string or null",
   "process": "string or null",
   "coating": "string or null"
-}
-Do not invent missing specs. Use null for unknown fields.`
+}`
 
 	userPrompt := fmt.Sprintf("Analyze and normalize this product: %s", query)
 
@@ -243,18 +248,16 @@ Your primary rule is SEMANTIC RELEVANCE:
   * Set "is_relevant": false
   * Set "top_code": ""
   * Set "confidence_score": 0.0
-  * Set "reason": "Explain clearly why the retrieved candidates do not match the product (e.g. 'Retrieved candidates describe garments/car-coats, not automobiles/motor vehicles')."
-  * Set "questions": Provide 1-2 actionable questions asking for CLASSIFICATION-RELEVANT SPECIFICATIONS (such as primary material, construction, or technical specifications) needed to classify it into the correct HS Chapter. DO NOT ask trivial or obvious questions like 'Do you mean a bottle or a heater?' when the product intent is clear. For example:
-    - 'What is the product primarily made of? (e.g. Plastic, Stainless Steel, Glass, Aluminium)'
-    - 'Is it vacuum-insulated (thermal flask) or a single-wall container?'
+  * Set "reason": "Explain clearly why the retrieved candidates do not match the product."
+  * Set "questions": At most 2 short, actionable questions asking for CLASSIFICATION-RELEVANT SPECIFICATIONS that would change which HS chapter or heading applies. Each question must target a DIFFERENT attribute (e.g. one about material, one about processing stage). Do NOT ask questions that are already answered by the product attributes. Do NOT ask redundant or overlapping questions. Use colon-separated option lists where helpful (e.g. 'What is the primary material: wood, metal, plastic, or rubber?').
 
 If at least one candidate genuinely matches:
   * Set "is_relevant": true
   * Set "top_code": "best matching code"
-  * Set "confidence_score": 0.1 to 1.0 based on precision
+  * Set "confidence_score": 0.1 to 1.0 based on precision (use 0.85+ only when material AND form are confirmed; use 0.4-0.69 when one key attribute is unknown)
   * Set "reason": "Detailed explanation of why this code matches"
   * Set "alternatives": [{"code": "...", "description": "..."}]
-  * Set "questions": ["1-2 technical questions (e.g., material percentage, engine capacity in cc, voltage, power, or specific dimensions) needed to confirm the exact 6-digit subheading versus alternatives"]
+  * Set "questions": At most 2 short questions, each targeting a DIFFERENT classification attribute that could change the exact 6-digit subheading. Do NOT ask a question if the attribute is already provided in the product data. Do NOT generate overlapping questions.
 
 Return ONLY valid JSON matching this schema:
 {
