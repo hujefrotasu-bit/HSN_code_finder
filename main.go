@@ -8,10 +8,13 @@ import (
 	"strconv"
 	"strings"
 
+	"time"
+
 	"ai-hsn-code-finder/internal/ai"
 	"ai-hsn-code-finder/internal/database"
 	"ai-hsn-code-finder/internal/routes"
 	"ai-hsn-code-finder/internal/search"
+	"ai-hsn-code-finder/internal/tradestat"
 	"ai-hsn-code-finder/internal/validator"
 )
 
@@ -113,12 +116,15 @@ func main() {
 	val := validator.NewValidator(codeMap)
 	aiClient := ai.NewClient(llmEndpoint, llmModel, usdToInrRate, inputPricePerMUSD, outputPricePerMUSD)
 
-	// 4. Initialize Handler & Routes
-	handler := routes.NewHandler(aiClient, searcher, aiClient, val, cache, codeMap)
+	// 4. Initialize TradeStat Client
+	tradestatClient := tradestat.NewClient(30*time.Second, 10*time.Minute, 3)
+
+	// 5. Initialize Handler & Routes
+	handler := routes.NewHandler(aiClient, searcher, aiClient, val, cache, codeMap, tradestatClient)
 	mux := http.NewServeMux()
 	routes.RegisterRoutes(mux, handler)
 
-	// 5. Start Server
+	// 6. Start Server
 	serverAddr := ":" + port
 	log.Printf("Server listening on http://localhost%s", serverAddr)
 	if err := http.ListenAndServe(serverAddr, mux); err != nil {

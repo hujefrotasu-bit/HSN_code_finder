@@ -102,3 +102,57 @@ type Cache interface {
 	Get(ctx context.Context, key string) (*ClassificationResult, bool, error)
 	Set(ctx context.Context, key string, result *ClassificationResult) error
 }
+
+// TradeStatisticsRequest represents the parameters for retrieving TradeStat data.
+type TradeStatisticsRequest struct {
+	HSCode    string `json:"hsCode"`
+	TradeType string `json:"tradeType"` // "export" or "import"
+	Year      string `json:"year"`      // e.g. "2025", "2024"
+	Unit      string `json:"unit"`      // "1" (₹ Crore), "2" (US $ Million), "3" (Quantity)
+}
+
+// TradeData contains the parsed numerical and descriptive statistics for a commodity.
+type TradeData struct {
+	Commodity                 string   `json:"commodity"`
+	UnitName                  string   `json:"unitName,omitempty"`
+	PreviousYearValue         *float64 `json:"previousYearValue"`
+	PreviousYearShare         *float64 `json:"previousYearShare"`
+	CurrentYearValue          *float64 `json:"currentYearValue"`
+	CurrentYearShare          *float64 `json:"currentYearShare"`
+	GrowthPercent             *float64 `json:"growthPercent"`
+	NationalTotalPreviousYear *float64 `json:"nationalTotalPreviousYear"`
+	NationalTotalCurrentYear  *float64 `json:"nationalTotalCurrentYear"`
+}
+
+// CountryTableData represents the official commodity_wise_all_countries TradeStat report table.
+type CountryTableData struct {
+	Headers    []string   `json:"headers"`
+	SubHeaders []string   `json:"subHeaders"`
+	Rows       [][]string `json:"rows"`
+	TotalRow   []string   `json:"totalRow,omitempty"`
+	IndiaTotal []string   `json:"indiaTotal,omitempty"`
+	ShareRow   []string   `json:"shareRow,omitempty"`
+}
+
+// TradeStatisticsResponse represents the structured statistics response returned to the frontend.
+type TradeStatisticsResponse struct {
+	Success        bool              `json:"success"`
+	Source         string            `json:"source"`
+	HSCode         string            `json:"hsCode"`
+	TradeType      string            `json:"tradeType"`
+	FinancialYears []string          `json:"financialYears"`
+	Unit           string            `json:"unit"`
+	ReportDate     string            `json:"reportDate"`
+	Headers        []string          `json:"headers,omitempty"`
+	Row            []string          `json:"row,omitempty"`
+	FooterRow      []string          `json:"footerRow,omitempty"`
+	Data           *TradeData        `json:"data,omitempty"`
+	CountryTable   *CountryTableData `json:"countryTable,omitempty"`
+	Error          string            `json:"error,omitempty"`
+}
+
+// TradeStatService defines the interface for fetching trade statistics.
+type TradeStatService interface {
+	FetchStatistics(ctx context.Context, req TradeStatisticsRequest) (*TradeStatisticsResponse, error)
+}
+
